@@ -1,7 +1,9 @@
 import os
 import sys
 from logging.config import fileConfig
-from sqlalchemy import engine_from_config, pool
+
+from sqlalchemy import engine_from_config
+from sqlalchemy import pool
 from alembic import context
 
 # 1. Fix Python path so Render can find the 'app' folder
@@ -19,7 +21,7 @@ if config.config_file_name is not None:
 
 # 2. Import your models and set target_metadata FIRST (before running migrations)
 from app.database import Base
-from app.models import User, Post, CampaignMetric  # Ensure models are imported
+from app.models import User, Post, CampaignMetric  # Ensure all models are imported
 target_metadata = Base.metadata
 
 # 3. Force Alembic to use Render's DATABASE_URL
@@ -63,6 +65,7 @@ def run_migrations_online() -> None:
             context.run_migrations()
 
 
+# 4. Trigger migrations last (after everything is configured)
 if context.is_offline_mode():
     run_migrations_offline()
 else:
