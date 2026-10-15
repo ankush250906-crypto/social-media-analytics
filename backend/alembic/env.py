@@ -1,7 +1,14 @@
 import os
+import sys
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
+
+# 1. Fix Python path so Render can find the 'app' folder
+current_dir = os.path.dirname(os.path.abspath(__file__))
+backend_dir = os.path.abspath(os.path.join(current_dir, '..'))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
 
 # This is the Alembic Config object
 config = context.config
@@ -10,13 +17,53 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# --- FORCE ALEMBIC TO USE RENDER'S DATABASE_URL ---
+# 2. Import your models and set target_metadata FIRST (before running migrations)
+from app.database import Base
+from app.models import User, Post, CampaignMetric  # Ensure models are imported
+target_metadata = Base.metadata
+
+# 3. Force Alembic to use Render's DATABASE_URL
 database_url = os.getenv("DATABASE_URL")
 if database_url:
     config.set_main_option("sqlalchemy.url", database_url)
-# --------------------------------------------------
 
-# Add your model's MetaData object here for 'autogenerate' support
-from app.database import Base
-from app.models import User, Post, CampaignMetric  # Ensure all models are imported
-target_metadata = Base.metadata
+
+def run_migrations_offline() -> None:
+    """Run migrations in 'offline' mode."""
+    url = config.get_main_option("sqlalchemy.url")
+    context.configure(
+        url=url,
+        target_metadata=target_metadata,
+        literal_binds=True,
+        dialect_opts={"paramstyle": "named"},
+    )
+
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+def run_migrations_online() -> None:
+    """Run migrations in 'online' mode."""
+    configuration = config.get_section(config.config_ini_section, {})
+    if database_url:
+        configuration["sqlalchemy.url"] = database_url
+
+    connectable = engine_from_config(
+        configuration,
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
+
+    with connectable.connect() as connection:
+        context.configure(
+            connection=connection, target_metadata=target_metadata
+        )
+
+        with context.begin_transaction():
+            context.run_migrations()
+
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()
